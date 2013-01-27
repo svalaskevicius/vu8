@@ -6,6 +6,7 @@
 #include <boost/type_traits/integral_constant.hpp>
 #include <boost/type_traits/is_arithmetic.hpp>
 #include <boost/type_traits/is_same.hpp>
+#include <boost/type_traits/is_pointer.hpp>
 #include <boost/type_traits/remove_const.hpp>
 #include <boost/type_traits/remove_reference.hpp>
 
@@ -27,6 +28,11 @@ struct is_to_v8_convertible : public boost::false_type { };
 template <class T>
 struct is_to_v8_convertible<T, typename boost::enable_if<
     boost::is_arithmetic<T>
+>::type> : public boost::true_type { };
+
+template <class T>
+struct is_to_v8_convertible<T, typename boost::enable_if<
+    boost::is_pointer<T>
 >::type> : public boost::true_type { };
 
 #define VU8_TO_V8_CONV_TYPE_TRAIT_SPEC(T,M,spec) \

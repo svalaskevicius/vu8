@@ -5,7 +5,7 @@ namespace vu8 { namespace detail {
 
 template <class T>
 class Singleton {
-  protected:
+  public:
     struct object_creator {
         object_creator() { Singleton<T>::Instance(); }
         inline void do_nothing() const {}
@@ -29,7 +29,7 @@ Singleton<T>::create_object;
 
 template <class T>
 class LazySingleton {
-  protected:
+  public:
     typedef T object_type;
 
     static object_type& Instance() {

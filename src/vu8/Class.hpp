@@ -67,21 +67,13 @@ struct ClassSingletonFactory<M, NoFactory> {
 
 template <class T, class Factory>
 class ClassSingleton
-  : private detail::LazySingleton< ClassSingleton<T, Factory> >,
+  : public detail::LazySingleton< ClassSingleton<T, Factory> >,
     public ClassSingletonFactory<ClassSingleton<T, Factory>, Factory>
 {
     friend class ClassSingletonFactory<ClassSingleton<T, Factory>, Factory>;
 
     typedef ClassSingleton<T, Factory> self;
     typedef ValueHandle (T::*MethodCallback)(const v8::Arguments& args);
-
-    v8::Persistent<v8::FunctionTemplate>& ClassFunctionTemplate() {
-        return func_;
-    }
-
-    v8::Persistent<v8::FunctionTemplate>& JSFunctionTemplate() {
-        return this->JSFunctionTemplateHelper();
-    }
 
     // invoke passing javascript object argument directly
     template <class P>
@@ -118,12 +110,12 @@ class ClassSingleton
     boost::enable_if<typename P::IS_RETURN_WRAPPED_CLASS,
     ValueHandle >::type ForwardReturn (T *obj, const v8::Arguments& args) {
         typedef typename P::ClassSingleton LocalSelf;
-        typedef typename P::return_type ReturnType;
+        typedef typename remove_reference_and_const<typename P::return_type>::type ReturnType;
 
         v8::HandleScope scope;
         ReturnType* return_value = new ReturnType(Invoke<P>(obj, args));
         v8::Local<v8::Object> localObj =
-            LocalSelf::Instance().func_->GetFunction()->NewInstance();
+            LocalSelf::Instance().ClassFunctionTemplate()->GetFunction()->NewInstance();
         v8::Persistent<v8::Object> persistentObj =
             v8::Persistent<v8::Object>::New(localObj);
         persistentObj->SetInternalField(0, v8::External::New(return_value));
@@ -163,15 +155,6 @@ class ClassSingleton
         return NULL;
     }
 
-    static inline void MadeWeak(v8::Persistent<v8::Value> object,
-                                void                     *parameter)
-    {
-        T *obj = static_cast<T *>(parameter);
-        delete(obj);
-        object.Dispose();
-        object.Clear();
-    }
-
     v8::Handle<v8::Object> WrapObject(const v8::Arguments& args) {
         v8::HandleScope scope;
         T *wrap = detail::ArgFactory<T, Factory>::New(args);
@@ -197,6 +180,25 @@ class ClassSingleton
     friend class detail::LazySingleton<self>;
     friend struct Class<T, Factory>;
     friend struct Singleton<T>;
+
+public:
+    v8::Persistent<v8::FunctionTemplate>& ClassFunctionTemplate() {
+        return func_;
+    }
+
+    v8::Persistent<v8::FunctionTemplate>& JSFunctionTemplate() {
+        return this->JSFunctionTemplateHelper();
+    }
+
+    static inline void MadeWeak(v8::Persistent<v8::Value> object,
+                                void                     *parameter)
+    {
+        T *obj = static_cast<T *>(parameter);
+        delete(obj);
+        object.Dispose();
+        object.Clear();
+    }
+
 };
 
 // Interface for registering C++ classes with v8
@@ -228,9 +230,9 @@ struct Class {
         return Method< detail::MemFun<T, P, Ptr> >(name);
     }
 
-    template <class P, typename detail::MemFunProto<T const, P>::method_type Ptr>
-    inline Class& Set(char const *name) {
-        return Method< detail::MemFun<T const, P, Ptr> >(name);
+    template <class B, class P, typename detail::MemFunProto<B, P>::method_type Ptr>
+    inline typename boost::enable_if<typename boost::is_base_of<B, T>::type, Class&>::type Set(char const *name) {
+        return Method< detail::MemFun<B, P, Ptr> >(name);
     }
 
     // passing v8::Arguments directly but modify return type

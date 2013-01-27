@@ -9,6 +9,9 @@
 #include <stdexcept>
 #include <vector>
 
+#include <boost/utility.hpp>
+#include <boost/type_traits/is_enum.hpp>
+
 namespace vu8 { namespace detail {
 
 typedef v8::Handle<v8::Value> ValueHandle;
@@ -18,7 +21,7 @@ struct FromV8Base {
     typedef T result_type;
 };
 
-template <class T>
+template <class T, class Enable = void>
 struct FromV8;
 
 template <>
@@ -107,6 +110,16 @@ struct FromV8<uint64_t> : FromV8Base<uint64_t> {
             throw std::runtime_error("expected javascript number");
 
         return static_cast<uint64_t>(value->ToNumber()->Value());
+    }
+};
+
+template <class T>
+struct FromV8<T, typename boost::enable_if<boost::is_enum<T> >::type> : FromV8Base<T> {
+    static inline T exec(ValueHandle value) {
+        if (! value->IsNumber())
+            throw std::runtime_error("expected javascript number");
+
+        return static_cast<T>(value->ToNumber()->Value());
     }
 };
 
