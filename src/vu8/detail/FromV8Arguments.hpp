@@ -22,7 +22,7 @@ namespace fu = boost::fusion;
 
 template <int first, int current, int last, class T>
 static inline typename boost::disable_if_c<(current < last), void>::type
-FromV8Arguments(T& dest, const v8::Arguments& args) {}
+FromV8Arguments(T& , const v8::Arguments& ) {}
 
 template <int first, int current, int last, class T>
 static inline typename boost::enable_if_c<(current < last), void>::type
@@ -48,8 +48,7 @@ static inline void FromV8Arguments(T& dest, const v8::Arguments& args) {
 /// Converts v8::Arguments into fusion::vector of C++ types
 /// @arg S Supplimentary fusion::vector to for stack storage of converted types
 template <int offset, class T, class S>
-static inline void FromV8Arguments(T& dest, const v8::Arguments& args, S& strings) {
-}
+static inline void FromV8Arguments(T&, const v8::Arguments&, S&) {}
 
 } }
 #endif

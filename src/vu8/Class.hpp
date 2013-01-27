@@ -57,7 +57,8 @@ class ClassSingletonFactory {
 };
 
 template <class M>
-struct ClassSingletonFactory<M, NoFactory> {
+class ClassSingletonFactory<M, NoFactory> {
+  public:
     enum { HAS_NULL_FACTORY = true };
 
     v8::Persistent<v8::FunctionTemplate>& JSFunctionTemplateHelper() {
@@ -107,8 +108,12 @@ class ClassSingleton
 
     template <class P>
     static inline typename
-    boost::enable_if<typename P::IS_RETURN_WRAPPED_CLASS,
-    ValueHandle >::type ForwardReturn (T *obj, const v8::Arguments& args) {
+    boost::enable_if<
+        typename t_logical_and<
+            typename P::IS_RETURN_WRAPPED_CLASS,
+            typename t_negate< typename vu8::is_to_v8_convertible<typename P::return_type>::type >::type
+        >::type,
+    ValueHandle>::type ForwardReturn (T *obj, const v8::Arguments& args) {
         typedef typename P::ClassSingleton LocalSelf;
         typedef typename remove_reference_and_const<typename P::return_type>::type ReturnType;
 
@@ -155,18 +160,6 @@ class ClassSingleton
         return NULL;
     }
 
-    v8::Handle<v8::Object> WrapObject(const v8::Arguments& args) {
-        v8::HandleScope scope;
-        T *wrap = detail::ArgFactory<T, Factory>::New(args);
-        v8::Local<v8::Object> localObj = func_->GetFunction()->NewInstance();
-        v8::Persistent<v8::Object> obj =
-            v8::Persistent<v8::Object>::New(localObj);
-
-        obj->SetPointerInInternalField(0, wrap);
-        obj.MakeWeak(wrap, &self::MadeWeak);
-        return scope.Close(obj);
-    }
-
     ClassSingleton()
       : func_(v8::Persistent<v8::FunctionTemplate>::New(v8::FunctionTemplate::New()))
     {
@@ -182,6 +175,18 @@ class ClassSingleton
     friend struct Singleton<T>;
 
 public:
+    v8::Handle<v8::Object> WrapObject(const v8::Arguments& args) {
+        v8::HandleScope scope;
+        T *wrap = detail::ArgFactory<T, Factory>::New(args);
+        v8::Local<v8::Object> localObj = func_->GetFunction()->NewInstance();
+        v8::Persistent<v8::Object> obj =
+            v8::Persistent<v8::Object>::New(localObj);
+
+        obj->SetPointerInInternalField(0, wrap);
+        obj.MakeWeak(wrap, &self::MadeWeak);
+        return scope.Close(obj);
+    }
+
     v8::Persistent<v8::FunctionTemplate>& ClassFunctionTemplate() {
         return func_;
     }

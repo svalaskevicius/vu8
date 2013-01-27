@@ -18,7 +18,7 @@
 namespace vu8 {
 
 template <class T, class F> struct Class;
-template <class T, class F> struct ClassSingleton;
+template <class T, class F> class ClassSingleton;
 
 namespace detail {
 

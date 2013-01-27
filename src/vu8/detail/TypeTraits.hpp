@@ -5,6 +5,7 @@
 
 #include <boost/type_traits/integral_constant.hpp>
 #include <boost/type_traits/is_arithmetic.hpp>
+#include <boost/type_traits/is_enum.hpp>
 #include <boost/type_traits/is_same.hpp>
 #include <boost/type_traits/is_pointer.hpp>
 #include <boost/type_traits/remove_const.hpp>
@@ -22,6 +23,28 @@ template <class T> struct remove_reference_and_const {
     >::type type;
 };
 
+template <class T>
+struct t_negate;
+
+template<>
+struct t_negate<boost::true_type> : boost::false_type {};
+template<>
+struct t_negate<boost::false_type> : boost::true_type {};
+
+
+template <class T, class O>
+struct t_logical_and;
+
+template<>
+struct t_logical_and<boost::false_type, boost::false_type> : boost::false_type {};
+template<>
+struct t_logical_and<boost::false_type, boost::true_type> : boost::false_type {};
+template<>
+struct t_logical_and<boost::true_type, boost::false_type> : boost::false_type {};
+template<>
+struct t_logical_and<boost::true_type, boost::true_type> : boost::true_type {};
+
+
 template <class T, class Enable = void>
 struct is_to_v8_convertible : public boost::false_type { };
 
@@ -32,8 +55,16 @@ struct is_to_v8_convertible<T, typename boost::enable_if<
 
 template <class T>
 struct is_to_v8_convertible<T, typename boost::enable_if<
+    boost::is_enum<T>
+>::type> : public boost::true_type { };
+
+template <class T>
+struct is_to_v8_convertible<T, typename boost::enable_if<
     boost::is_pointer<T>
 >::type> : public boost::true_type { };
+
+template <class T>
+struct is_to_v8_convertible<T &> : public is_to_v8_convertible<T> { };
 
 #define VU8_TO_V8_CONV_TYPE_TRAIT_SPEC(T,M,spec) \
 template <class T > \

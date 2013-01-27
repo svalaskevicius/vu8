@@ -11,6 +11,9 @@
 
 #include <boost/utility.hpp>
 #include <boost/type_traits/is_enum.hpp>
+#include <boost/type_traits/is_integral.hpp>
+#include <boost/type_traits/is_floating_point.hpp>
+#include <boost/type_traits/is_class.hpp>
 
 namespace vu8 { namespace detail {
 
@@ -93,23 +96,13 @@ struct FromV8<uint32_t> : FromV8Base<uint32_t> {
     }
 };
 
-template <>
-struct FromV8<int64_t> : FromV8Base<int64_t> {
-    static inline int64_t exec(ValueHandle value) {
+template <class T>
+struct FromV8<T, typename boost::enable_if<boost::is_integral<T> >::type> : FromV8Base<T> {
+    static inline T exec(ValueHandle value) {
         if (! value->IsNumber())
             throw std::runtime_error("expected javascript number");
 
-        return static_cast<int64_t>(value->ToNumber()->Value());
-    }
-};
-
-template <>
-struct FromV8<uint64_t> : FromV8Base<uint64_t> {
-    static inline uint64_t exec(ValueHandle value) {
-        if (! value->IsNumber())
-            throw std::runtime_error("expected javascript number");
-
-        return static_cast<uint64_t>(value->ToNumber()->Value());
+        return static_cast<T>(value->ToNumber()->Value());
     }
 };
 
@@ -123,13 +116,13 @@ struct FromV8<T, typename boost::enable_if<boost::is_enum<T> >::type> : FromV8Ba
     }
 };
 
-template <>
-struct FromV8<double> : FromV8Base<double> {
-    static inline double exec(ValueHandle value) {
+template <class T>
+struct FromV8<T, typename boost::enable_if<boost::is_floating_point<T> >::type> : FromV8Base<T> {
+    static inline T exec(ValueHandle value) {
         if (! value->IsNumber())
             throw std::runtime_error("expected javascript number");
 
-        return value->ToNumber()->Value();
+        return static_cast<T>(value->ToNumber()->Value());
     }
 };
 
@@ -214,6 +207,9 @@ struct FromV8<T const &> : FromV8Ref<T, T const&> {};
 
 template <class T>
 struct FromV8<T&> : FromV8Ref<T, T&> {};
+
+template <class T>
+struct FromV8<T, typename boost::enable_if<boost::is_class<T> >::type > : FromV8Ref<T, T&> {};
 
 } }
 #endif
