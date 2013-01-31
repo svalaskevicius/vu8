@@ -29,9 +29,6 @@ namespace mpl = boost::mpl;
 template < class T, class Factory = Factory<> >
 struct Class;
 
-template <class T>
-struct Singleton;
-
 template <class M, class Factory>
 class ClassSingletonFactory {
 
@@ -291,33 +288,6 @@ struct Class {
         JSFunctionTemplate()->Inherit(parent.ClassFunctionTemplate());
     }
     Class() {}
-
-    friend struct Singleton<T>;
-};
-
-// Wrap a C++ singleton
-template <class T>
-struct Singleton : Class<T, NoFactory> {
-    typedef Class<T> base;
-
-    template <class U, class V>
-    Singleton(Class<U, V>& parent, T* instance) : instance_(instance) {
-        base::JSFunctionTemplate()->Inherit(parent.ClassFunctionTemplate());
-    }
-    Singleton(T *instance) : instance_(instance) {}
-
-    v8::Persistent<v8::Object> NewInstance() {
-        v8::HandleScope scope;
-        v8::Persistent<v8::Object> obj =
-            v8::Persistent<v8::Object>::New(
-                this->Instance().func_->GetFunction()->NewInstance());
-
-        obj->SetPointerInInternalField(0, instance_);
-        return obj;
-    }
-
-  private:
-    T *instance_;
 };
 
 }
