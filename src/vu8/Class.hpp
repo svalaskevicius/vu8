@@ -59,7 +59,7 @@ class ClassSingletonFactory<M, NoFactory> {
     enum { HAS_NULL_FACTORY = true };
 
     v8::Persistent<v8::FunctionTemplate>& JSFunctionTemplateHelper() {
-        return static_cast<M &>(*this).func_;
+        return static_cast<M &>(*this).ClassFunctionTemplate();
     }
 };
 
@@ -68,8 +68,6 @@ class ClassSingleton
   : public detail::LazySingleton< ClassSingleton<T, Factory> >,
     public ClassSingletonFactory<ClassSingleton<T, Factory>, Factory>
 {
-    friend class ClassSingletonFactory<ClassSingleton<T, Factory>, Factory>;
-
     typedef ClassSingleton<T, Factory> self;
     typedef ValueHandle (T::*MethodCallback)(const v8::Arguments& args);
 
@@ -125,25 +123,6 @@ class ClassSingleton
         return scope.Close(localObj);
     }
 
-    // every method is run inside a handle scope
-    template <class P>
-    static inline ValueHandle Forward(const v8::Arguments& args) {
-        v8::HandleScope scope;
-
-        // this will kill without zero-overhead exception handling
-        try {
-            return scope.Close(
-                ForwardReturn<P>(
-                    retrieveNativeObjectPtr(args.Holder()),
-                    args
-                )
-            );
-        }
-        catch (std::runtime_error const& e) {
-            return Throw(e.what());
-        }
-    }
-
     static inline T* retrieveNativeObjectPtr(v8::Local<v8::Value> value)
     {
         while (value->IsObject()) {
@@ -157,6 +136,9 @@ class ClassSingleton
         return NULL;
     }
 
+    v8::Persistent<v8::FunctionTemplate> func_;
+
+public:
     ClassSingleton()
       : func_(v8::Persistent<v8::FunctionTemplate>::New(v8::FunctionTemplate::New()))
     {
@@ -165,13 +147,6 @@ class ClassSingleton
         func_->InstanceTemplate()->SetInternalFieldCount(1);
     }
 
-    v8::Persistent<v8::FunctionTemplate> func_;
-
-    friend class detail::LazySingleton<self>;
-    friend struct Class<T, Factory>;
-    friend struct Singleton<T>;
-
-public:
     v8::Handle<v8::Object> WrapObject(const v8::Arguments& args) {
         v8::HandleScope scope;
         T *wrap = detail::ArgFactory<T, Factory>::New(args);
@@ -201,6 +176,25 @@ public:
         object.Clear();
     }
 
+    // every method is run inside a handle scope
+    template <class P>
+    static inline ValueHandle Forward(const v8::Arguments& args) {
+        v8::HandleScope scope;
+
+        // this will kill without zero-overhead exception handling
+        try {
+            return scope.Close(
+                ForwardReturn<P>(
+                    retrieveNativeObjectPtr(args.Holder()),
+                    args
+                )
+            );
+        }
+        catch (std::runtime_error const& e) {
+            return Throw(e.what());
+        }
+    }
+
 };
 
 // Interface for registering C++ classes with v8
@@ -210,11 +204,6 @@ public:
 template <class T, class Factory>
 struct Class {
     typedef ClassSingleton<T, Factory>  singleton_t;
-
-  private:
-    typedef typename singleton_t::MethodCallback  MethodCallback;
-
-    inline singleton_t& Instance() { return singleton_t::Instance(); }
 
     // method helper
     template <class P>
@@ -226,6 +215,9 @@ struct Class {
     }
 
   public:
+
+    static inline singleton_t& Instance() { return singleton_t::Instance(); }
+
     // method with any prototype
     template <class P, typename detail::MemFunProto<T, P>::method_type Ptr>
     inline Class& Set(char const *name) {
@@ -261,8 +253,7 @@ struct Class {
     // class. It will not take ownership of the C++ pointer.
     static inline v8::Handle<v8::Object> ReferenceExternal(T *ext) {
         v8::HandleScope scope;
-        v8::Local<v8::Object> obj =
-            singleton_t::Instance().func_->GetFunction()->NewInstance();
+        v8::Local<v8::Object> obj = Instance().func_->GetFunction()->NewInstance();
         obj->SetPointerInInternalField(0, ext);
         return scope.Close(obj);
     }
@@ -271,11 +262,9 @@ struct Class {
     // object is deleted. You must use "new" to allocate ext.
     static inline v8::Handle<v8::Object> ImportExternal(T *ext) {
         v8::HandleScope scope;
-        v8::Local<v8::Object> localObj =
-            singleton_t::Instance().func_->GetFunction()->NewInstance();
+        v8::Local<v8::Object> localObj = Instance().func_->GetFunction()->NewInstance();
 
-        v8::Persistent<v8::Object> obj =
-            v8::Persistent<v8::Object>::New(localObj);
+        v8::Persistent<v8::Object> obj = v8::Persistent<v8::Object>::New(localObj);
 
         obj->SetPointerInInternalField(0, ext);
         obj.MakeWeak(ext, &singleton_t::MadeWeak);
