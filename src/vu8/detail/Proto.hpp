@@ -25,6 +25,7 @@ Fun<P, Ptr>::function_pointer = Ptr;
 template <class C, class P, typename MemFunProto<C, P>::method_type Ptr>
 struct MemFun : MemFunProto<C, P> {
     typedef typename MemFunProto<C, P>::method_type method_type;
+    typedef boost::false_type is_selector;
     static method_type method_pointer;
 };
 

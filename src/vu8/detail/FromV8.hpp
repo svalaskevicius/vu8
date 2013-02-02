@@ -29,8 +29,11 @@ struct FromV8;
 
 template <>
 struct FromV8<std::string> : FromV8Base<std::string> {
-    static inline std::string exec(ValueHandle value) {
-        if (! value->IsString())
+    static inline bool test(const ValueHandle & value) {
+        return value->IsString();
+    }
+    static inline std::string exec(const ValueHandle & value) {
+        if (! test(value))
             throw std::runtime_error("cannot make string from non-string type");
 
         v8::String::Utf8Value str(value);
@@ -40,8 +43,11 @@ struct FromV8<std::string> : FromV8Base<std::string> {
 
 template <>
 struct FromV8<ConvertibleString> : FromV8Base<ConvertibleString> {
-    static inline ConvertibleString exec(ValueHandle value) {
-        if (! value->IsString())
+    static inline bool test(const ValueHandle & value) {
+        return value->IsString();
+    }
+    static inline ConvertibleString exec(const ValueHandle & value) {
+        if (! test(value))
             throw std::runtime_error("cannot make string from non-string type");
 
         v8::String::Utf8Value str(value);
@@ -61,8 +67,11 @@ template <>
 struct FromV8< v8::Handle<v8::Function> >
   : FromV8Base< v8::Handle<v8::Function> >
 {
+    static inline bool test(const ValueHandle & value) {
+        return value->IsFunction();
+    }
     static inline v8::Handle<v8::Function> exec(ValueHandle value) {
-        if (! value->IsFunction())
+        if (! test(value))
             throw std::runtime_error("expected javascript function");
 
         return value.As<v8::Function>();
@@ -71,15 +80,21 @@ struct FromV8< v8::Handle<v8::Function> >
 
 template <>
 struct FromV8<bool> : FromV8Base<bool> {
-    static inline bool exec(ValueHandle value) {
+    static inline bool test(const ValueHandle &) {
+        return true;
+    }
+    static inline bool exec(const ValueHandle & value) {
         return value->ToBoolean()->Value();
     }
 };
 
 template <>
 struct FromV8<int32_t> : FromV8Base<int32_t> {
-    static inline int32_t exec(ValueHandle value) {
-        if (! value->IsNumber())
+    static inline bool test(const ValueHandle & value) {
+        return value->IsNumber();
+    }
+    static inline int32_t exec(const ValueHandle & value) {
+        if (! test(value))
             throw std::runtime_error("expected javascript number");
 
         return value->ToInt32()->Value();
@@ -88,8 +103,11 @@ struct FromV8<int32_t> : FromV8Base<int32_t> {
 
 template <>
 struct FromV8<uint32_t> : FromV8Base<uint32_t> {
+    static inline bool test(const ValueHandle & value) {
+        return value->IsNumber();
+    }
     static inline uint32_t exec(ValueHandle value) {
-        if (! value->IsNumber())
+        if (! test(value))
             throw std::runtime_error("expected javascript number");
 
         return value->ToUint32()->Value();
@@ -98,8 +116,11 @@ struct FromV8<uint32_t> : FromV8Base<uint32_t> {
 
 template <class T>
 struct FromV8<T, typename boost::enable_if<boost::is_integral<T> >::type> : FromV8Base<T> {
+    static inline bool test(const ValueHandle & value) {
+        return value->IsNumber();
+    }
     static inline T exec(ValueHandle value) {
-        if (! value->IsNumber())
+        if (! test(value))
             throw std::runtime_error("expected javascript number");
 
         return static_cast<T>(value->ToNumber()->Value());
@@ -108,8 +129,11 @@ struct FromV8<T, typename boost::enable_if<boost::is_integral<T> >::type> : From
 
 template <class T>
 struct FromV8<T, typename boost::enable_if<boost::is_enum<T> >::type> : FromV8Base<T> {
+    static inline bool test(const ValueHandle & value) {
+        return value->IsNumber();
+    }
     static inline T exec(ValueHandle value) {
-        if (! value->IsNumber())
+        if (! test(value))
             throw std::runtime_error("expected javascript number");
 
         return static_cast<T>(value->ToNumber()->Value());
@@ -118,8 +142,11 @@ struct FromV8<T, typename boost::enable_if<boost::is_enum<T> >::type> : FromV8Ba
 
 template <class T>
 struct FromV8<T, typename boost::enable_if<boost::is_floating_point<T> >::type> : FromV8Base<T> {
+    static inline bool test(const ValueHandle & value) {
+        return value->IsNumber();
+    }
     static inline T exec(ValueHandle value) {
-        if (! value->IsNumber())
+        if (! test(value))
             throw std::runtime_error("expected javascript number");
 
         return static_cast<T>(value->ToNumber()->Value());
@@ -129,8 +156,11 @@ struct FromV8<T, typename boost::enable_if<boost::is_floating_point<T> >::type> 
 
 template <class T, class A>
 struct FromV8< std::vector<T, A> > : FromV8Base< std::vector<T, A> > {
+    static inline bool test(const ValueHandle & value) {
+        return value->IsArray();
+    }
     static inline std::vector<T, A> exec(ValueHandle value) {
-        if (! value->IsArray())
+        if (! test(value))
             throw std::runtime_error("expected javascript array");
 
         v8::Array *array = v8::Array::Cast(*value);
@@ -145,6 +175,9 @@ struct FromV8< std::vector<T, A> > : FromV8Base< std::vector<T, A> > {
 
 template <>
 struct FromV8<ValueHandle> : FromV8Base<ValueHandle> {
+    static inline bool test(const ValueHandle &) {
+        return true;
+    }
     static inline ValueHandle exec(ValueHandle value) {
         return value;
     }
@@ -154,6 +187,9 @@ struct FromV8<ValueHandle> : FromV8Base<ValueHandle> {
 // extracting classes
 template <class T>
 struct FromV8Ptr : FromV8Base<T> {
+    static inline bool test(const ValueHandle & value) {
+        return value->IsObject() || value->IsNull();
+    }
     static inline T exec(ValueHandle value) {
         if (! value->IsObject()) {
             if (value->IsNull()) {
@@ -183,8 +219,11 @@ template <class T, class U>
 struct FromV8Ref {
     typedef U result_type;
 
+    static inline bool test(const ValueHandle & value) {
+        return value->IsObject();
+    }
     static inline U exec(ValueHandle value) {
-        if (! value->IsObject())
+        if (! test(value))
             throw std::runtime_error("expected object");
 
         v8::Local<v8::Object> obj = value->ToObject();

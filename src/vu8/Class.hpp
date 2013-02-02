@@ -229,6 +229,12 @@ struct Class {
         return Method< detail::MemFun<B, P, Ptr> >(name);
     }
 
+    // method with selector
+    template <class S>
+    inline Class& Set(char const *name) {
+        return Method< S >(name);
+    }
+
     // passing v8::Arguments directly but modify return type
     template <class R, R (T::*Ptr)(const v8::Arguments&)>
     inline Class& Set(char const *name) {
