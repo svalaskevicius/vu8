@@ -19,8 +19,8 @@ namespace vu8 {
 namespace fu = boost::fusion;
 namespace mpl = boost::mpl;
 
-template <class T, class F> struct Class;
-template <class T>          struct Singleton;
+template <class T> struct Class;
+template <class T> struct Singleton;
 
 struct Module {
     // register v8 style callback
@@ -31,9 +31,9 @@ struct Module {
         return *this;
     }
 
-    template <class T, class F>
-    inline Module& operator()(char const *name, Class<T, F>& clss) {
-        obj_->Set(v8::String::New(name), clss.JSFunctionTemplate()->GetFunction());
+    template <class T>
+    inline Module& operator()(char const *name, Class<T>& clss) {
+        obj_->Set(v8::String::New(name), clss.ConstructorFunctionTemplate()->GetFunction());
 
         clss.ClassFunctionTemplate()->SetClassName(v8::String::New(name));
         return *this;
@@ -58,8 +58,8 @@ struct Module {
         return (*this)(name, callback);
     }
 
-    template <class T, class F>
-    inline Module& Set(char const *name, Class<T, F>& clss) {
+    template <class T>
+    inline Module& Set(char const *name, Class<T>& clss) {
         return (*this)(name, clss);
     }
 

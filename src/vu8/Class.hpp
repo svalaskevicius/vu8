@@ -26,50 +26,20 @@ namespace vu8 {
 namespace fu = boost::fusion;
 namespace mpl = boost::mpl;
 
-template < class T, class Factory = Factory<> >
+template < class T >
 struct Class;
 
-template <class M, class Factory>
-class ClassSingletonFactory {
-
-    M& mixin() { return static_cast<M &>(*this); }
-
-    static inline ValueHandle ConstructorFunction(const v8::Arguments& args) {
-        return M::Instance().WrapObject(args);
-    }
-
-  public:
-    v8::Persistent<v8::FunctionTemplate>& JSFunctionTemplateHelper() {
-        return mixin().jsFunc_;
-    }
-
-    enum { HAS_NULL_FACTORY = false };
-
-    ClassSingletonFactory()
-      : jsFunc_(v8::Persistent<v8::FunctionTemplate>::New(v8::FunctionTemplate::New(
-            &ConstructorFunction)))
-    {}
-
-    v8::Persistent<v8::FunctionTemplate> jsFunc_;
-};
-
-template <class M>
-class ClassSingletonFactory<M, NoFactory> {
-  public:
-    enum { HAS_NULL_FACTORY = true };
-
-    v8::Persistent<v8::FunctionTemplate>& JSFunctionTemplateHelper() {
-        return static_cast<M &>(*this).ClassFunctionTemplate();
-    }
-};
-
-template <class T, class Factory>
+template <class T>
 class ClassSingleton
-  : public detail::LazySingleton< ClassSingleton<T, Factory> >,
-    public ClassSingletonFactory<ClassSingleton<T, Factory>, Factory>
+  : public detail::LazySingleton< ClassSingleton<T> > 
 {
-    typedef ClassSingleton<T, Factory> self;
+    typedef ClassSingleton<T> self;
     typedef ValueHandle (T::*MethodCallback)(const v8::Arguments& args);
+
+    template <class Factory>
+    static inline ValueHandle ConstructorFunction(const v8::Arguments& args) {
+        return self::Instance().template WrapObject<Factory>(args);
+    }
 
     // invoke passing javascript object argument directly
     template <class P>
@@ -136,21 +106,22 @@ class ClassSingleton
         return NULL;
     }
 
-    v8::Persistent<v8::FunctionTemplate> func_;
+    v8::Persistent<v8::FunctionTemplate> _classFunc;
+    v8::Persistent<v8::FunctionTemplate> _constructorFunc; 
 
 public:
     ClassSingleton()
-      : func_(v8::Persistent<v8::FunctionTemplate>::New(v8::FunctionTemplate::New()))
+      : _classFunc(v8::Persistent<v8::FunctionTemplate>::New(v8::FunctionTemplate::New()))
     {
-        if (! this->HAS_NULL_FACTORY)
-            func_->Inherit(JSFunctionTemplate());
-        func_->InstanceTemplate()->SetInternalFieldCount(1);
+        _classFunc->InstanceTemplate()->SetInternalFieldCount(1);
+        _constructorFunc = _classFunc;
     }
 
+    template<class Factory>
     v8::Handle<v8::Object> WrapObject(const v8::Arguments& args) {
         v8::HandleScope scope;
         T *wrap = detail::ArgFactory<T, Factory>::New(args);
-        v8::Local<v8::Object> localObj = func_->GetFunction()->NewInstance();
+        v8::Local<v8::Object> localObj = _classFunc->GetFunction()->NewInstance();
         v8::Persistent<v8::Object> obj =
             v8::Persistent<v8::Object>::New(localObj);
 
@@ -160,11 +131,11 @@ public:
     }
 
     v8::Persistent<v8::FunctionTemplate>& ClassFunctionTemplate() {
-        return func_;
+        return _classFunc;
     }
-
-    v8::Persistent<v8::FunctionTemplate>& JSFunctionTemplate() {
-        return this->JSFunctionTemplateHelper();
+    
+    v8::Persistent<v8::FunctionTemplate>& ConstructorFunctionTemplate() {
+        return _constructorFunc;
     }
 
     static inline void MadeWeak(v8::Persistent<v8::Value> object,
@@ -195,25 +166,42 @@ public:
         }
     }
 
+    template <class P>
+    inline void Method(char const *name) {
+        _classFunc->PrototypeTemplate()->Set(
+            v8::String::New(name),
+            v8::FunctionTemplate::New(&self::template Forward<P>)
+        );
+    }
+
+    template <class S>
+    inline void Constructor() {
+        _constructorFunc = v8::Persistent<v8::FunctionTemplate>::New(
+            v8::FunctionTemplate::New(&self::template ConstructorFunction<S>)
+        );
+        _classFunc->Inherit(_constructorFunc);
+    }
 };
 
 // Interface for registering C++ classes with v8
 // T = class
 // Factory = factory for allocating c++ object
 //           by default Class uses zero-argument constructor
-template <class T, class Factory>
+template <class T>
 struct Class {
-    typedef ClassSingleton<T, Factory>  singleton_t;
+    typedef ClassSingleton<T>  singleton_t;
 
-    // method helper
     template <class P>
-    inline Class& Method(char const *name) {
-        ClassFunctionTemplate()->PrototypeTemplate()->Set(
-            v8::String::New(name),
-            v8::FunctionTemplate::New(&singleton_t::template Forward<P>));
+    inline Class &Method(char const *name) {
+        Instance().template Method<P>(name);
         return *this;
     }
 
+    template <class S>
+    inline Class& Constructor() {
+        Instance().template Constructor<S>();
+        return *this;
+    }
   public:
 
     static inline singleton_t& Instance() { return singleton_t::Instance(); }
@@ -251,15 +239,15 @@ struct Class {
         return Instance().ClassFunctionTemplate();
     }
 
-    inline v8::Persistent<v8::FunctionTemplate>& JSFunctionTemplate() {
-        return Instance().JSFunctionTemplate();
+    inline v8::Persistent<v8::FunctionTemplate>& ConstructorFunctionTemplate() {
+        return Instance().ConstructorFunctionTemplate();
     }
 
     // create javascript object which references externally created C++
     // class. It will not take ownership of the C++ pointer.
     static inline v8::Handle<v8::Object> ReferenceExternal(T *ext) {
         v8::HandleScope scope;
-        v8::Local<v8::Object> obj = Instance().func_->GetFunction()->NewInstance();
+        v8::Local<v8::Object> obj = Instance()._classFunc->GetFunction()->NewInstance();
         obj->SetPointerInInternalField(0, ext);
         return scope.Close(obj);
     }
@@ -268,7 +256,7 @@ struct Class {
     // object is deleted. You must use "new" to allocate ext.
     static inline v8::Handle<v8::Object> ImportExternal(T *ext) {
         v8::HandleScope scope;
-        v8::Local<v8::Object> localObj = Instance().func_->GetFunction()->NewInstance();
+        v8::Local<v8::Object> localObj = Instance()._classFunc->GetFunction()->NewInstance();
 
         v8::Persistent<v8::Object> obj = v8::Persistent<v8::Object>::New(localObj);
 
@@ -278,10 +266,6 @@ struct Class {
         return scope.Close(obj);
     }
 
-    template <class U, class V>
-    Class(Class<U, V>& parent) {
-        JSFunctionTemplate()->Inherit(parent.ClassFunctionTemplate());
-    }
     Class() {}
 };
 
