@@ -38,7 +38,11 @@ class ClassSingleton
 
     template <class Factory>
     static inline ValueHandle ConstructorFunction(const v8::Arguments& args) {
-        return self::Instance().template WrapObject<Factory>(args);
+        try {
+            return self::Instance().template WrapObject<Factory>(args);
+        } catch (std::runtime_error const& e) {
+            return Throw(e.what());
+        }
     }
 
     // invoke passing javascript object argument directly
@@ -160,8 +164,7 @@ public:
                     args
                 )
             );
-        }
-        catch (std::runtime_error const& e) {
+        } catch (std::runtime_error const& e) {
             return Throw(e.what());
         }
     }

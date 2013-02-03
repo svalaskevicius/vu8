@@ -65,16 +65,9 @@ class ArgFactory {
     typedef typename F::template Construct<T>  factory_t;
 
   public:
-    static inline typename factory_t::type *New(const v8::Arguments& args) {
-        // TODO: replace with CallFromV8
-        typedef typename
-            detail::MakeArgStorage<typename factory_t::arguments>::type arg_tl;
-
-        typedef typename fu::result_of::as_vector<arg_tl>::type arg_vec;
-        arg_vec cpp_args;
-
-        detail::FromV8Arguments<0>(cpp_args, args);
-        return boost::fusion::invoke(factory_t(), cpp_args);
+    static inline typename factory_t::return_type New(const v8::Arguments& args) {
+        factory_t factory;
+        return CallFromV8<factory_t, factory_t>(factory, args);
     }
 };
 

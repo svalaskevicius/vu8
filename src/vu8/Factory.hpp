@@ -60,14 +60,18 @@ struct Factory<
     template <class C>
     struct Construct {
         // boost::functional::factory does the same but boost-1.37 doesn't have it
-        typedef C type;
+        typedef typename Factory<BOOST_PP_ENUM_PARAMS(n,T)>::Construct<C> self;
+        typedef boost::false_type is_selector;
         typedef boost::mpl::vector<BOOST_PP_ENUM_PARAMS(n,T)> arguments;
+        typedef C*(self::*method_type)(BOOST_PP_ENUM(n, VU8_FACTORY_args, ~));
 
-        typedef C* result_type;
+        typedef C* return_type;
 
-        C *operator()(BOOST_PP_ENUM(n, VU8_FACTORY_args, ~)) {
+        return_type operator()(BOOST_PP_ENUM(n, VU8_FACTORY_args, ~)) {
             return new C(BOOST_PP_ENUM_PARAMS(n,arg));
         }
+
+        const static constexpr method_type method_pointer = &self::operator();
     };
 };
 
