@@ -25,6 +25,9 @@ struct CallFromV8Helper;
 template <class P, class T>
 static inline typename boost::disable_if<typename P::is_selector, typename P::return_type>::type
 CallFromV8(T& obj, const v8::Arguments& args) {
+    if (fu::result_of::size<typename P::arguments>::value != args.Length()) {
+        throw std::runtime_error("argument count does not match function definition");
+    }
     return CallFromV8Helper<
         P, T, fu::result_of::size<typename P::arguments>::value
     >::exec(obj, args);
