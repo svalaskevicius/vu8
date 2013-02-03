@@ -41,6 +41,7 @@ struct Selector<M, Methods...> {
     typedef boost::true_type is_selector;
     typedef boost::false_type is_empty;
     typedef typename M::MemFun::return_type return_type;
+    typedef typename M::MemFun::IS_RETURN_WRAPPED_CLASS IS_RETURN_WRAPPED_CLASS;
 
     static inline return_type callFromV8(typename M::ClassName &obj, const v8::Arguments& args) {
         if (suitable(args)) {
@@ -187,9 +188,9 @@ class ClassSingleton
             typename t_negate< typename vu8::is_to_v8_convertible<typename P::return_type>::type >::type
         >::type,
     ValueHandle>::type ForwardReturn (T *obj, const v8::Arguments& args) {
-        typedef typename P::ClassSingleton LocalSelf;
+        typedef typename vu8::ClassSingleton<typename remove_reference_and_const<typename P::return_type>::type> LocalSelf;
         typedef typename remove_reference_and_const<typename P::return_type>::type ReturnType;
-
+// TODO check if we already have the given ref if returned by T&
         v8::HandleScope scope;
         ReturnType* return_value = new ReturnType(Invoke<P>(obj, args));
         v8::Local<v8::Object> localObj =

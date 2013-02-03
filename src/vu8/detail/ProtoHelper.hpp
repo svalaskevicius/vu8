@@ -18,7 +18,6 @@
 namespace vu8 {
 
 template <class T> struct Class;
-template <class T> class ClassSingleton;
 
 namespace detail {
 
@@ -72,7 +71,6 @@ struct MemFunProto<C, R ( BOOST_PP_ENUM_PARAMS(n, A) ), typename boost::enable_i
     typedef mpl::vector<BOOST_PP_ENUM_PARAMS(n, A)>   arguments;
     typedef R(C::*method_type)(BOOST_PP_ENUM_PARAMS(n, A));
     typedef boost::true_type IS_RETURN_WRAPPED_CLASS;
-    typedef vu8::ClassSingleton<typename remove_reference_and_const<R>::type> ClassSingleton;
 };
 
 template <class C, class R BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, class A)>
@@ -80,7 +78,6 @@ struct MemFunProto<C, R ( BOOST_PP_ENUM_PARAMS(n, A) ) const, typename boost::en
     typedef mpl::vector<BOOST_PP_ENUM_PARAMS(n, A)>   arguments;
     typedef R(C::*method_type)(BOOST_PP_ENUM_PARAMS(n, A)) const;
     typedef boost::true_type IS_RETURN_WRAPPED_CLASS;
-    typedef vu8::ClassSingleton<typename remove_reference_and_const<R>::type> ClassSingleton;
 };
 
 } }
