@@ -33,17 +33,14 @@ struct t_negate<boost::false_type> : boost::true_type {};
 
 
 template <class T, class O>
-struct t_logical_and;
-
-template<>
-struct t_logical_and<boost::false_type, boost::false_type> : boost::false_type {};
-template<>
-struct t_logical_and<boost::false_type, boost::true_type> : boost::false_type {};
-template<>
-struct t_logical_and<boost::true_type, boost::false_type> : boost::false_type {};
-template<>
+struct t_logical_and : boost::false_type {};
+template <>
 struct t_logical_and<boost::true_type, boost::true_type> : boost::true_type {};
 
+template <class T, class O>
+struct t_logical_or : boost::true_type {};
+template <>
+struct t_logical_or<boost::false_type, boost::false_type> : boost::false_type {};
 
 template <class T, class Enable = void>
 struct is_to_v8_convertible : public boost::false_type { };

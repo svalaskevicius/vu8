@@ -60,9 +60,25 @@ private:
     }
 
     template <class Next>
-    static inline typename boost::disable_if<typename Next::is_empty, return_type>::type
+    static inline typename boost::disable_if<
+        typename t_logical_or<
+            typename Next::is_empty::type,
+            typename boost::is_void<return_type>::type
+        >::type
+    , return_type>::type
     callNext(typename M::ClassName &obj, const v8::Arguments& args) {
         return Next::callFromV8(obj, args);
+    }
+
+    template <class Next>
+    static inline typename boost::disable_if<
+        typename t_logical_or<
+            typename Next::is_empty::type,
+            typename t_negate<typename boost::is_void<return_type>::type>::type
+        >::type
+    , return_type>::type
+    callNext(typename M::ClassName &obj, const v8::Arguments& args) {
+        Next::callFromV8(obj, args);
     }
 };
 
