@@ -50,24 +50,29 @@ struct ArgValidator : ArgValidatorBase
 };
 
 template <class Args>
-struct ArgValidator<Args, 0> : ArgValidatorBase 
+struct ArgValidator<Args, -1> : ArgValidatorBase 
 {
-    static inline bool args_suitable(const v8::Arguments& v8args) {
-        if (!ArgValidatorBase::template arg_suitable<typename mpl::at_c<Args, 0>::type>(v8args[0])) {
-            return false;
-        }
+    static inline bool args_suitable(const v8::Arguments&) {
         return true;
     }
 };
 
-template <class T, class F>
-class ArgFactory {
-    typedef typename F::template Construct<T>  factory_t;
+template <class T, class F, typename Enable = void>
+struct ArgFactory;
 
-  public:
-    static inline typename factory_t::return_type New(const v8::Arguments& args) {
+template <class T, class F>
+struct ArgFactory<T, F, typename boost::disable_if<typename F::is_selector>::type> {
+    static inline T * New(const v8::Arguments& args) {
+        typedef typename F::template Construct<T>  factory_t;
         factory_t factory;
         return CallFromV8<factory_t, factory_t>(factory, args);
+    }
+};
+
+template <class T, class F>
+struct ArgFactory<T, F, typename boost::enable_if<typename F::is_selector>::type> {
+    static inline T * New(const v8::Arguments& args) {
+        return F::template New<T>(args);
     }
 };
 
@@ -123,6 +128,50 @@ private:
 
 template <>
 struct Selector<> {
+    typedef boost::true_type is_selector;
+    typedef boost::true_type is_empty;
+};
+
+
+template <class... Factories> struct FactorySelector;
+
+template <class F, class... Factories>
+struct FactorySelector<F, Factories...> {
+
+    typedef boost::true_type is_selector;
+    typedef boost::false_type is_empty;
+    
+    template <class C>
+    static inline C *New(const v8::Arguments& args) {
+        if (suitable<C>(args)) {
+            return ArgFactory<C, F>::New(args);
+        }
+        return callNext<C, FactorySelector<Factories...>>(args);
+    }
+private:
+    template <class C>
+    static inline bool suitable(const v8::Arguments& args) {
+        if (fu::result_of::size<typename F::template Construct<C>::arguments>::value != args.Length()) {
+            return false;
+        }
+        return ArgValidator<typename F::template Construct<C>::arguments>::args_suitable(args);
+    }
+
+    template <class C, class Next>
+    static inline typename boost::enable_if<typename Next::is_empty, C*>::type
+    callNext(const v8::Arguments&) {
+        throw std::runtime_error("no matches found for the function paramters");
+    }
+
+    template <class C, class Next>
+    static inline typename boost::disable_if<typename Next::is_empty, C*>::type
+    callNext(const v8::Arguments& args) {
+        return Next::template New<C>(args);
+    }
+};
+
+template <>
+struct FactorySelector<> {
     typedef boost::true_type is_selector;
     typedef boost::true_type is_empty;
 };
