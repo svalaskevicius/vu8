@@ -27,11 +27,10 @@ namespace fu = boost::fusion;
 namespace mpl = boost::mpl;
 
 template <class T, class P, typename detail::MemFunProto<T, P>::method_type Ptr>
-struct Method {
-    typedef T ClassName;
-    typedef detail::MemFun<T, P, Ptr> MemFun;
-};
+struct Method : detail::MemFun<T, P, Ptr> {};
 
+template <class T>
+class ClassSingleton;
 
 template <class... Methods> struct Selector;
 
@@ -40,46 +39,29 @@ struct Selector<M, Methods...> {
 
     typedef boost::true_type is_selector;
     typedef boost::false_type is_empty;
-    typedef typename M::MemFun::return_type return_type;
-    typedef typename M::MemFun::IS_RETURN_WRAPPED_CLASS IS_RETURN_WRAPPED_CLASS;
-
-    static inline return_type callFromV8(typename M::ClassName &obj, const v8::Arguments& args) {
+    
+    template <class T>
+    static inline ValueHandle ForwardReturn(T *obj, const v8::Arguments& args) {
         if (suitable(args)) {
-            return CallFromV8<typename M::MemFun>(obj, args);
+            return ClassSingleton<T>::template ForwardReturn<M>(obj, args);
         }
-        return callNext<Selector<Methods...>>(obj, args);
+        return callNext<T, Selector<Methods...>>(obj, args);
     }
 private:
     static inline bool suitable(const v8::Arguments& args) {
-        return detail::ArgValidator<typename M::MemFun::arguments>::test(args);
+        return detail::ArgValidator<typename M::arguments>::test(args);
     }
 
-    template <class Next>
-    static inline typename boost::enable_if<typename Next::is_empty, return_type>::type
-    callNext(typename M::ClassName &, const v8::Arguments&) {
+    template <class T, class Next>
+    static inline typename boost::enable_if<typename Next::is_empty, ValueHandle>::type
+    callNext(T *, const v8::Arguments&) {
         throw std::runtime_error("no matches found for the function paramters");
     }
 
-    template <class Next>
-    static inline typename boost::disable_if<
-        typename t_logical_or<
-            typename Next::is_empty::type,
-            typename boost::is_void<return_type>::type
-        >::type
-    , return_type>::type
-    callNext(typename M::ClassName &obj, const v8::Arguments& args) {
-        return Next::callFromV8(obj, args);
-    }
-
-    template <class Next>
-    static inline typename boost::disable_if<
-        typename t_logical_or<
-            typename Next::is_empty::type,
-            typename t_negate<typename boost::is_void<return_type>::type>::type
-        >::type
-    , return_type>::type
-    callNext(typename M::ClassName &obj, const v8::Arguments& args) {
-        Next::callFromV8(obj, args);
+    template <class T, class Next>
+    static inline typename boost::disable_if<typename Next::is_empty::type, ValueHandle>::type
+    callNext(T *obj, const v8::Arguments& args) {
+        return Next::template ForwardReturn<T>(obj, args);
     }
 };
 
@@ -164,6 +146,24 @@ class ClassSingleton
     Invoke(T *obj, const v8::Arguments& args) {
         return CallFromV8<P>(*obj, args);
     }
+    
+    static inline T* retrieveNativeObjectPtr(v8::Local<v8::Value> value)
+    {
+        while (value->IsObject()) {
+            v8::Local<v8::Object> obj = value->ToObject();
+            T * native = static_cast<T *>(obj->GetPointerFromInternalField(0));
+            if (native) {
+                return native;
+            }
+            value = obj->GetPrototype();
+        }
+        return NULL;
+    }
+
+    v8::Persistent<v8::FunctionTemplate> _classFunc;
+    v8::Persistent<v8::FunctionTemplate> _constructorFunc; 
+
+public:
 
     template <class P>
     static inline typename
@@ -202,23 +202,13 @@ class ClassSingleton
         return scope.Close(localObj);
     }
 
-    static inline T* retrieveNativeObjectPtr(v8::Local<v8::Value> value)
-    {
-        while (value->IsObject()) {
-            v8::Local<v8::Object> obj = value->ToObject();
-            T * native = static_cast<T *>(obj->GetPointerFromInternalField(0));
-            if (native) {
-                return native;
-            }
-            value = obj->GetPrototype();
-        }
-        return NULL;
+    template <class P>
+    static inline typename
+    boost::enable_if<typename P::is_selector,
+    ValueHandle>::type ForwardReturn (T *obj, const v8::Arguments& args) {
+        return P::template ForwardReturn<T>(obj, args);
     }
 
-    v8::Persistent<v8::FunctionTemplate> _classFunc;
-    v8::Persistent<v8::FunctionTemplate> _constructorFunc; 
-
-public:
     ClassSingleton()
       : _classFunc(v8::Persistent<v8::FunctionTemplate>::New(v8::FunctionTemplate::New()))
     {
