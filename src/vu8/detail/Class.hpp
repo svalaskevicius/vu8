@@ -29,6 +29,37 @@ struct PassDirectIf<P, typename P::arguments> : boost::is_same<
     const v8::Arguments&,
     typename mpl::front<typename P::arguments>::type> {};
 
+struct ArgValidatorBase 
+{
+    template <class Arg>
+    static inline bool arg_suitable(const v8::Local<v8::Value> &v8arg) {
+        return FromV8<Arg>::test(v8arg); 
+    }
+};
+
+template <class Args, int N = fu::result_of::size<Args>::value - 1>
+struct ArgValidator : ArgValidatorBase 
+{
+    static inline bool args_suitable(const v8::Arguments& v8args) {
+        if (!ArgValidatorBase::template arg_suitable<typename mpl::at_c<Args, N>::type>(v8args[N])) {
+            return false;
+        }
+        return ArgValidator<Args, N-1>::args_suitable(v8args);
+    }
+
+};
+
+template <class Args>
+struct ArgValidator<Args, 0> : ArgValidatorBase 
+{
+    static inline bool args_suitable(const v8::Arguments& v8args) {
+        if (!ArgValidatorBase::template arg_suitable<typename mpl::at_c<Args, 0>::type>(v8args[0])) {
+            return false;
+        }
+        return true;
+    }
+};
+
 template <class T, class F>
 class ArgFactory {
     typedef typename F::template Construct<T>  factory_t;
@@ -83,34 +114,6 @@ private:
         }
         return ArgValidator<typename M::MemFun::arguments>::args_suitable(args);
     }
-
-    struct ArgValidatorBase {
-        template <class Arg>
-        static inline bool arg_suitable(const v8::Local<v8::Value> &v8arg) {
-            return FromV8<Arg>::test(v8arg); 
-        }
-    };
-   
-    template <class Args, int N = fu::result_of::size<Args>::value - 1>
-    struct ArgValidator : ArgValidatorBase {
-        static inline bool args_suitable(const v8::Arguments& v8args) {
-            if (!ArgValidatorBase::template arg_suitable<typename mpl::at_c<Args, N>::type>(v8args[N])) {
-                return false;
-            }
-            return ArgValidator<Args, N-1>::args_suitable(v8args);
-        }
-
-    };
-    
-    template <class Args>
-    struct ArgValidator<Args, 0> : ArgValidatorBase {
-        static inline bool args_suitable(const v8::Arguments& v8args) {
-            if (!ArgValidatorBase::template arg_suitable<typename mpl::at_c<Args, 0>::type>(v8args[0])) {
-                return false;
-            }
-            return true;
-        }
-    };
 
     template <class Next>
     static inline typename boost::enable_if<typename Next::is_empty, return_type>::type
