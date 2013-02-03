@@ -26,6 +26,94 @@ namespace vu8 {
 namespace fu = boost::fusion;
 namespace mpl = boost::mpl;
 
+template <class T, class P, typename detail::MemFunProto<T, P>::method_type Ptr>
+struct Method {
+    typedef T ClassName;
+    typedef detail::MemFun<T, P, Ptr> MemFun;
+};
+
+
+template <class... Methods> struct Selector;
+
+template <class M, class... Methods>
+struct Selector<M, Methods...> {
+
+    typedef boost::true_type is_selector;
+    typedef boost::false_type is_empty;
+    typedef typename M::MemFun::return_type return_type;
+
+    static inline return_type callFromV8(typename M::ClassName &obj, const v8::Arguments& args) {
+        if (suitable(args)) {
+            return CallFromV8<typename M::MemFun>(obj, args);
+        }
+        return callNext<Selector<Methods...>>(obj, args);
+    }
+private:
+    static inline bool suitable(const v8::Arguments& args) {
+        return detail::ArgValidator<typename M::MemFun::arguments>::test(args);
+    }
+
+    template <class Next>
+    static inline typename boost::enable_if<typename Next::is_empty, return_type>::type
+    callNext(typename M::ClassName &, const v8::Arguments&) {
+        throw std::runtime_error("no matches found for the function paramters");
+    }
+
+    template <class Next>
+    static inline typename boost::disable_if<typename Next::is_empty, return_type>::type
+    callNext(typename M::ClassName &obj, const v8::Arguments& args) {
+        return Next::callFromV8(obj, args);
+    }
+};
+
+template <>
+struct Selector<> {
+    typedef boost::true_type is_selector;
+    typedef boost::true_type is_empty;
+};
+
+
+template <class... Factories> struct FactorySelector;
+
+template <class F, class... Factories>
+struct FactorySelector<F, Factories...> {
+
+    typedef boost::true_type is_selector;
+    typedef boost::false_type is_empty;
+    
+    template <class C>
+    static inline C *New(const v8::Arguments& args) {
+        if (suitable<C>(args)) {
+            return detail::ArgFactory<C, F>::New(args);
+        }
+        return callNext<C, FactorySelector<Factories...>>(args);
+    }
+private:
+    template <class C> static inline bool
+    suitable(const v8::Arguments& args) {
+        return detail::ArgValidator<typename F::template Construct<C>::arguments>::test(args);
+    }
+
+    template <class C, class Next>
+    static inline typename boost::enable_if<typename Next::is_empty, C*>::type
+    callNext(const v8::Arguments&) {
+        throw std::runtime_error("no matches found for the function paramters");
+    }
+
+    template <class C, class Next>
+    static inline typename boost::disable_if<typename Next::is_empty, C*>::type
+    callNext(const v8::Arguments& args) {
+        return Next::template New<C>(args);
+    }
+};
+
+template <>
+struct FactorySelector<> {
+    typedef boost::true_type is_selector;
+    typedef boost::true_type is_empty;
+};
+
+
 template < class T >
 struct Class;
 
