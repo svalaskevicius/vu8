@@ -40,6 +40,12 @@ struct ArgValidatorBase
 template <class Args, int N = fu::result_of::size<Args>::value - 1>
 struct ArgValidator : ArgValidatorBase 
 {
+    static inline bool test(const v8::Arguments& v8args) {
+        if (fu::result_of::size<Args>::value != v8args.Length()) {
+            return false;
+        }
+        return args_suitable(v8args);
+    }
     static inline bool args_suitable(const v8::Arguments& v8args) {
         if (!ArgValidatorBase::template arg_suitable<typename mpl::at_c<Args, N>::type>(v8args[N])) {
             return false;
@@ -52,6 +58,9 @@ struct ArgValidator : ArgValidatorBase
 template <class Args>
 struct ArgValidator<Args, -1> : ArgValidatorBase 
 {
+    static inline bool test(const v8::Arguments& v8args) {
+        return v8args.Length() == 0;
+    }
     static inline bool args_suitable(const v8::Arguments&) {
         return true;
     }
@@ -107,10 +116,7 @@ struct Selector<M, Methods...> {
     }
 private:
     static inline bool suitable(const v8::Arguments& args) {
-        if (fu::result_of::size<typename M::MemFun::arguments>::value != args.Length()) {
-            return false;
-        }
-        return ArgValidator<typename M::MemFun::arguments>::args_suitable(args);
+        return ArgValidator<typename M::MemFun::arguments>::test(args);
     }
 
     template <class Next>
@@ -149,12 +155,9 @@ struct FactorySelector<F, Factories...> {
         return callNext<C, FactorySelector<Factories...>>(args);
     }
 private:
-    template <class C>
-    static inline bool suitable(const v8::Arguments& args) {
-        if (fu::result_of::size<typename F::template Construct<C>::arguments>::value != args.Length()) {
-            return false;
-        }
-        return ArgValidator<typename F::template Construct<C>::arguments>::args_suitable(args);
+    template <class C> static inline bool
+    suitable(const v8::Arguments& args) {
+        return ArgValidator<typename F::template Construct<C>::arguments>::test(args);
     }
 
     template <class C, class Next>
