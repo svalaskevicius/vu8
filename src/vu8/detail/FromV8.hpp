@@ -2,12 +2,15 @@
 #define TSA_VU8_DETAIL_FROM_V8_HPP
 
 #include <vu8/detail/ConvertibleString.hpp>
+#include <vu8/detail/TypeSafety.hpp>
 
 #include <v8.h>
 
 #include <string>
 #include <stdexcept>
 #include <vector>
+#include <map>
+#include <iostream>
 
 #include <boost/utility.hpp>
 #include <boost/type_traits/is_enum.hpp>
@@ -185,23 +188,42 @@ struct FromV8<ValueHandle> : FromV8Base<ValueHandle> {
 
 ////////////////////////////////////////////////////////////////////////////
 // extracting classes
+
+template <class T>
+static inline bool test_v8_object(const ValueHandle & value) {
+    if (!value->IsObject()) {
+        return false;
+    }
+    v8::Local<v8::Object> obj = value->ToObject();
+    if (! obj->InternalFieldCount()) {
+        return false;
+    }
+    bool ret = (bool) Instance::get<T>(obj->GetPointerFromInternalField(0));
+    if (!ret) {
+        std::cerr << "failed to match value for type "<<typeid(T*).name()<<std::endl;
+    } else {
+        std::cerr << "ptr matched "<<typeid(T*).name()<<std::endl;
+    }
+    return ret;
+}
+
 template <class T>
 struct FromV8Ptr : FromV8Base<T> {
     static inline bool test(const ValueHandle & value) {
-        return value->IsObject() || value->IsNull();
+        if (value->IsNull()) {
+            return true;
+        }
+        return test_v8_object<typename std::remove_pointer<T>::type>(value);
     }
     static inline T exec(ValueHandle value) {
-        if (! value->IsObject()) {
-            if (value->IsNull()) {
-                return NULL;
-            }
-            throw std::runtime_error("expected object");
+        if (!test(value)) {
+            throw std::runtime_error("expected object or null");
+        }
+        if (value->IsNull()) {
+            return nullptr;
         }
 
         v8::Local<v8::Object> obj = value->ToObject();
-
-        if (! obj->InternalFieldCount())
-            throw std::runtime_error("expected c++ wrapped object");
 
         return static_cast<T>(obj->GetPointerFromInternalField(0));
     }
@@ -220,7 +242,7 @@ struct FromV8Ref {
     typedef U result_type;
 
     static inline bool test(const ValueHandle & value) {
-        return value->IsObject();
+        return test_v8_object<T>(value);
     }
     static inline U exec(ValueHandle value) {
         if (! test(value))

@@ -14,12 +14,7 @@
 #define BOOST_FUSION_INVOKE_MAX_ARITY VU8_PP_ITERATION_LIMIT
 #include <boost/fusion/include/invoke.hpp>
 
-#include <boost/any.hpp>
-#include <map>
-
 namespace vu8 { namespace detail {
-
-static std::map<void *, boost::any> instanceMap;
 
 template <class P, typename Enable = void>
 struct PassDirectIf : boost::false_type {};
@@ -74,7 +69,9 @@ struct ArgFactory<T, F, typename boost::disable_if<typename F::is_selector>::typ
     static inline T * New(const v8::Arguments& args) {
         typedef typename F::template Construct<T>  factory_t;
         factory_t factory;
-        return CallFromV8<factory_t, factory_t>(factory, args);
+        T *ptr = CallFromV8<factory_t, factory_t>(factory, args);
+        Instance::set(ptr);
+        return ptr;
     }
 };
 

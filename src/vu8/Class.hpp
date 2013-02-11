@@ -10,6 +10,7 @@
 #include <vu8/detail/Singleton.hpp>
 #include <vu8/detail/Class.hpp>
 #include <vu8/detail/TypeTraits.hpp>
+#include <vu8/detail/TypeSafety.hpp>
 
 #include <boost/fusion/container/vector.hpp>
 #include <boost/fusion/adapted/mpl.hpp>
@@ -193,6 +194,9 @@ public:
 // TODO check if we already have the given ref if returned by T&
         v8::HandleScope scope;
         ReturnType* return_value = new ReturnType(Invoke<P>(obj, args));
+
+        detail::Instance::set(return_value);
+
         v8::Local<v8::Object> localObj =
             LocalSelf::Instance().ClassFunctionTemplate()->GetFunction()->NewInstance();
         v8::Persistent<v8::Object> persistentObj =
@@ -241,6 +245,7 @@ public:
                                 void                     *parameter)
     {
         T *obj = static_cast<T *>(parameter);
+        detail::Instance::del(obj);
         delete(obj);
         object.Dispose();
         object.Clear();
@@ -303,6 +308,12 @@ struct Class {
   public:
 
     static inline singleton_t& Instance() { return singleton_t::Instance(); }
+
+    template <class To>
+    inline Class& ConvertibleTo() {
+        detail::register_convertible_type<T, To>();
+        return *this;
+    }
 
     // method with any prototype
     template <class P, typename detail::MemFunProto<T, P>::method_type Ptr>
