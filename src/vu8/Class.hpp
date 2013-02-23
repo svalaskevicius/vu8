@@ -127,7 +127,7 @@ class ClassSingleton
     template <class Factory>
     static inline ValueHandle ConstructorFunction(const v8::Arguments& args) {
         try {
-            return self::Instance().template WrapObject<Factory>(args);
+            return self::Instance().template CreateNew<Factory>(args);
         } catch (std::runtime_error const& e) {
             return Throw(e.what());
         }
@@ -221,15 +221,17 @@ public:
     }
 
     template<class Factory>
-    v8::Handle<v8::Object> WrapObject(const v8::Arguments& args) {
-        v8::HandleScope scope;
-        T *wrap = detail::ArgFactory<T, Factory>::New(args);
-        v8::Local<v8::Object> localObj = _classFunc->GetFunction()->NewInstance();
-        v8::Persistent<v8::Object> obj =
-            v8::Persistent<v8::Object>::New(localObj);
+    v8::Handle<v8::Object> CreateNew(const v8::Arguments& args) {
+        return WrapObject(detail::ArgFactory<T, Factory>::New(args));
+    }
 
-        obj->SetPointerInInternalField(0, wrap);
-        obj.MakeWeak(wrap, &self::MadeWeak);
+    v8::Handle<v8::Object> WrapObject(T *native) {
+        v8::HandleScope scope;
+        v8::Local<v8::Object> localObj = _classFunc->GetFunction()->NewInstance();
+        v8::Persistent<v8::Object> obj = v8::Persistent<v8::Object>::New(localObj);
+
+        obj->SetPointerInInternalField(0, native);
+        obj.MakeWeak(native, &self::MadeWeak);
         return scope.Close(obj);
     }
 
