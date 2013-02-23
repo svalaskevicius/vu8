@@ -33,6 +33,11 @@ struct Method : detail::MemFun<T, P, Ptr> {};
 template <class T>
 class ClassSingleton;
 
+template <class T>
+struct ClassInfo {
+    typedef T Impl;
+};
+
 template <class... Methods> struct Selector;
 
 template <class M, class... Methods>
@@ -189,21 +194,14 @@ public:
             typename t_negate< typename vu8::is_to_v8_convertible<typename P::return_type>::type >::type
         >::type,
     ValueHandle>::type ForwardReturn (T *obj, const v8::Arguments& args) {
-        typedef typename vu8::ClassSingleton<typename remove_reference_and_const<typename P::return_type>::type> LocalSelf;
-        typedef typename remove_reference_and_const<typename P::return_type>::type ReturnType;
+        typedef typename ClassInfo<typename remove_reference_and_const<typename P::return_type>::type>::Impl ReturnTypeImpl;
+        typedef typename vu8::ClassSingleton<ReturnTypeImpl> ReturnClassDef;
 // TODO check if we already have the given ref if returned by T&
-        v8::HandleScope scope;
-        ReturnType* return_value = new ReturnType(Invoke<P>(obj, args));
+        ReturnTypeImpl* return_value = new ReturnTypeImpl(Invoke<P>(obj, args));
 
-        detail::Instance::set(return_value);
+        detail::Instance::add(return_value);
 
-        v8::Local<v8::Object> localObj =
-            LocalSelf::Instance().ClassFunctionTemplate()->GetFunction()->NewInstance();
-        v8::Persistent<v8::Object> persistentObj =
-            v8::Persistent<v8::Object>::New(localObj);
-        persistentObj->SetInternalField(0, v8::External::New(return_value));
-        persistentObj.MakeWeak(return_value, &LocalSelf::MadeWeak);
-        return scope.Close(localObj);
+        return ReturnClassDef::Instance().WrapObject(return_value);
     }
 
     template <class P>
