@@ -173,7 +173,7 @@ class Instance {
     }
 public:
     template <typename T>
-    static inline void set(T * ptr) {
+    static inline void add(T * ptr) {
         instanceMap().insert(std::make_pair(ptr, ptr));
         std::cout << "registering variable at "<<ptr<<" type: "<<typeid(T).name()<<" = "<<instanceMap()[ptr].type().name()<<std::endl;
     }

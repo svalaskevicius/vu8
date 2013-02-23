@@ -70,7 +70,7 @@ struct ArgFactory<T, F, typename boost::disable_if<typename F::is_selector>::typ
         typedef typename F::template Construct<T>  factory_t;
         factory_t factory;
         T *ptr = CallFromV8<factory_t, factory_t>(factory, args);
-        Instance::set(ptr);
+        Instance::add(ptr);
         return ptr;
     }
 };
