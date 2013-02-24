@@ -153,19 +153,6 @@ class ClassSingleton
         return CallFromV8<P>(*obj, args);
     }
     
-    static inline T* retrieveNativeObjectPtr(v8::Local<v8::Value> value)
-    {
-        while (value->IsObject()) {
-            v8::Local<v8::Object> obj = value->ToObject();
-            T * native = static_cast<T *>(obj->GetPointerFromInternalField(0));
-            if (native) {
-                return native;
-            }
-            value = obj->GetPrototype();
-        }
-        return NULL;
-    }
-
     v8::Persistent<v8::FunctionTemplate> _classFunc;
     v8::Persistent<v8::FunctionTemplate> _constructorFunc; 
 
@@ -260,7 +247,7 @@ public:
         try {
             return scope.Close(
                 ForwardReturn<P>(
-                    retrieveNativeObjectPtr(args.Holder()),
+                    static_cast<T *>(detail::retrieveNativeObjectPtr(args.Holder())),
                     args
                 )
             );

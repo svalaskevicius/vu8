@@ -189,16 +189,25 @@ struct FromV8<ValueHandle> : FromV8Base<ValueHandle> {
 ////////////////////////////////////////////////////////////////////////////
 // extracting classes
 
+static inline void* retrieveNativeObjectPtr(v8::Handle<v8::Value> value)
+{
+    while (value->IsObject()) {
+        v8::Local<v8::Object> obj = value->ToObject();
+        void * native = obj->GetPointerFromInternalField(0);
+        if (native) {
+            return native;
+        }
+        value = obj->GetPrototype();
+    }
+    return NULL;
+}
+
 template <class T>
 static inline bool test_v8_object(const ValueHandle & value) {
     if (!value->IsObject()) {
         return false;
     }
-    v8::Local<v8::Object> obj = value->ToObject();
-    if (! obj->InternalFieldCount()) {
-        return false;
-    }
-    bool ret = (bool) Instance::get<T>(obj->GetPointerFromInternalField(0));
+    bool ret = (bool) Instance::get<T>(retrieveNativeObjectPtr(value));
     if (!ret) {
         std::cerr << "failed to match value for type "<<typeid(T*).name()<<std::endl;
     } else {
@@ -223,9 +232,7 @@ struct FromV8Ptr : FromV8Base<T> {
             return nullptr;
         }
 
-        v8::Local<v8::Object> obj = value->ToObject();
-
-        return static_cast<T>(obj->GetPointerFromInternalField(0));
+        return static_cast<T>(retrieveNativeObjectPtr(value));
     }
 };
 
@@ -245,15 +252,11 @@ struct FromV8Ref {
         return test_v8_object<T>(value);
     }
     static inline U exec(ValueHandle value) {
-        if (! test(value))
+        if (! test(value)) {
             throw std::runtime_error("expected object");
+        }
 
-        v8::Local<v8::Object> obj = value->ToObject();
-
-        if (! obj->InternalFieldCount())
-            throw std::runtime_error("expected c++ wrapped object");
-
-        return *static_cast<T *>(obj->GetPointerFromInternalField(0));
+        return *static_cast<T *>(retrieveNativeObjectPtr(value));
     }
 };
 
