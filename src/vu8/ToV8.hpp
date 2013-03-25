@@ -21,7 +21,39 @@ static inline ValueHandle ToV8(char const *src) {
     return v8::String::New(src);
 }
 
+static inline ValueHandle ToV8(double const src) {
+    return v8::Number::New(src);
+}
+
+static inline ValueHandle ToV8(float const src) {
+    return v8::Number::New(src);
+}
+
+static inline ValueHandle ToV8(int32_t const src) {
+    return v8::Int32::New(src);
+}
+
+static inline ValueHandle ToV8(uint32_t const src) {
+    return v8::Uint32::New(src);
+}
+
 static inline ValueHandle ToV8(int64_t const src) {
+#ifdef VU8_CHECK_NUMERIC_BOUNDS
+    // not supported yet
+#else
+    return v8::Number::New(src);
+#endif
+}
+
+static inline ValueHandle ToV8(uint64_t const src) {
+#ifdef VU8_CHECK_NUMERIC_BOUNDS
+    // not supported yet
+#else
+    return v8::Number::New(src);
+#endif
+}
+
+static inline ValueHandle ToV8(long long const src) {
 #ifdef VU8_CHECK_NUMERIC_BOUNDS
     // not supported yet
 #else
@@ -37,29 +69,6 @@ static inline ValueHandle ToV8(unsigned long long const src) {
 #endif
 }
 
-static inline ValueHandle ToV8(double const src) {
-    return v8::Number::New(src);
-}
-
-static inline ValueHandle ToV8(float const src) {
-    return v8::Number::New(src);
-}
-
-static inline ValueHandle ToV8(int32_t const src) {
-    return v8::Int32::New(src);
-}
-
-static inline ValueHandle ToV8(long const src) {
-    return v8::Int32::New(src);
-}
-
-static inline ValueHandle ToV8(uint32_t const src) {
-    return v8::Uint32::New(src);
-}
-
-static inline ValueHandle ToV8(unsigned long const src) {
-    return v8::Uint32::New(src);
-}
 
 template <class T>
 static inline typename

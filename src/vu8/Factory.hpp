@@ -61,7 +61,11 @@ struct Factory<
     template <class C>
     struct Construct {
         // boost::functional::factory does the same but boost-1.37 doesn't have it
-        typedef typename Factory<BOOST_PP_ENUM_PARAMS(n,T)>::Construct<C> self;
+        typedef typename vu8::Factory<
+            BOOST_PP_ENUM_PARAMS(n,T)
+            BOOST_PP_COMMA_IF(n)
+            BOOST_PP_ENUM(BOOST_PP_SUB(VU8_FACTORY_MAX_SIZE,n), VU8_FACTORY_default, none)
+        >::template Construct<C> self;
         typedef boost::mpl::vector<BOOST_PP_ENUM_PARAMS(n,T)> arguments;
         typedef boost::false_type is_selector;
         typedef C*(self::*method_type)(BOOST_PP_ENUM(n, VU8_FACTORY_args, ~));
