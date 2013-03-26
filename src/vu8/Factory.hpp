@@ -30,6 +30,9 @@ struct V8ArgFactory {};
 struct NoFactory {};
 
 // primary template
+template <class C, BOOST_PP_ENUM(VU8_FACTORY_MAX_SIZE, VU8_FACTORY_header, ~)>
+struct ClassFactory;
+
 template <BOOST_PP_ENUM(VU8_FACTORY_MAX_SIZE, VU8_FACTORY_header, ~)>
 struct Factory;
 
@@ -49,6 +52,43 @@ struct Factory;
 
 namespace vu8 {
 
+template <class C  BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, class T)>
+struct ClassFactory<
+    C
+    BOOST_PP_COMMA_IF(n)
+    BOOST_PP_ENUM_PARAMS(n, T)
+    BOOST_PP_COMMA_IF(BOOST_PP_SUB(VU8_FACTORY_MAX_SIZE,n))
+    BOOST_PP_ENUM(BOOST_PP_SUB(VU8_FACTORY_MAX_SIZE,n), VU8_FACTORY_default, none)
+>
+{
+    typedef ClassFactory<C BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n,T)> self;
+    typedef boost::mpl::vector<BOOST_PP_ENUM_PARAMS(n,T)> arguments;
+    typedef boost::false_type is_selector;
+    typedef C*(self::*method_type)(BOOST_PP_ENUM(n, VU8_FACTORY_args, ~));
+
+    typedef C* return_type;
+
+    return_type operator()(BOOST_PP_ENUM(n, VU8_FACTORY_args, ~)) {
+        return new C(BOOST_PP_ENUM_PARAMS(n,arg));
+    }
+
+    static constexpr method_type method_pointer = &self::operator();
+};
+
+#define ClassFactoryType ClassFactory< \
+    C \
+    BOOST_PP_COMMA_IF(n) \
+    BOOST_PP_ENUM_PARAMS(n, T) \
+    BOOST_PP_COMMA_IF(BOOST_PP_SUB(VU8_FACTORY_MAX_SIZE,n)) \
+    BOOST_PP_ENUM(BOOST_PP_SUB(VU8_FACTORY_MAX_SIZE,n), VU8_FACTORY_default, none) \
+>
+template <class C  BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n, class T)>
+constexpr typename ClassFactoryType::method_type ClassFactoryType::method_pointer;
+#undef ClassFactoryType
+
+
+
+
 // specialization pattern
 template <BOOST_PP_ENUM_PARAMS(n, class T)>
 struct Factory<
@@ -58,26 +98,9 @@ struct Factory<
 >
 {
     typedef boost::false_type is_selector;
+
     template <class C>
-    struct Construct {
-        // boost::functional::factory does the same but boost-1.37 doesn't have it
-        typedef typename vu8::Factory<
-            BOOST_PP_ENUM_PARAMS(n,T)
-            BOOST_PP_COMMA_IF(n)
-            BOOST_PP_ENUM(BOOST_PP_SUB(VU8_FACTORY_MAX_SIZE,n), VU8_FACTORY_default, none)
-        >::template Construct<C> self;
-        typedef boost::mpl::vector<BOOST_PP_ENUM_PARAMS(n,T)> arguments;
-        typedef boost::false_type is_selector;
-        typedef C*(self::*method_type)(BOOST_PP_ENUM(n, VU8_FACTORY_args, ~));
-
-        typedef C* return_type;
-
-        return_type operator()(BOOST_PP_ENUM(n, VU8_FACTORY_args, ~)) {
-            return new C(BOOST_PP_ENUM_PARAMS(n,arg));
-        }
-
-        const static constexpr method_type method_pointer = &self::operator();
-    };
+    struct Construct : ClassFactory<C BOOST_PP_COMMA_IF(n) BOOST_PP_ENUM_PARAMS(n,T)> {};
 };
 
 }
